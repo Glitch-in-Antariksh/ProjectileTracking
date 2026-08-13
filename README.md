@@ -14,10 +14,9 @@ The development process is divided into the following stages:
 - [x] Raspberry Pi development environment
 - [x] Git and GitHub integration
 - [x] Initial project structure
-
-- [ ] Camera setup and testing
-- [ ] Capture synchronized stereo images
-- [ ] Camera calibration
+- [x] Camera setup and testing
+- [x] Capture synchronized stereo images
+- [x] Camera calibration
 - [ ] Stereo rectification
 - [ ] Depth estimation
 - [ ] Projectile detection
