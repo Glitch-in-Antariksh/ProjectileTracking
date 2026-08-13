@@ -91,7 +91,6 @@ def select_camera(cameras):
         root,
         text=(
             "Choose the camera you want to use.\n"
-            "A indicates a camera that looks like a stereo feed."
         ),
         font=("Arial", 10)
     )
