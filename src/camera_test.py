@@ -5,21 +5,21 @@ import time
 
 # CONFIGURATION
 MAX_CAMERA_INDEX = 10
-# A wide aspect ratio is a useful hint that a camera may be outputting two views side-by-side.
+# A wide aspect ratio is a useful hint that a camera may
+# output two views side-by-side.
 STEREO_ASPECT_RATIO = 2.0
-# Number of seconds used for the FPS measurement.
+# Number of seconds used for FPS measurement.
 FPS_TEST_DURATION = 3
 
 # CAMERA UTILITIES
 def open_camera(index):
     """
     Open a camera using the Windows DirectShow backend.
+
     Returns:
         cv2.VideoCapture object
     """
-
-    camera = cv2.VideoCapture(index, cv2.CAP_DSHOW)
-    return camera
+    return cv2.VideoCapture(index, cv2.CAP_DSHOW)
 
 
 def get_frame_info(frame):
@@ -29,7 +29,6 @@ def get_frame_info(frame):
     Returns:
         Dictionary containing frame dimensions and properties.
     """
-
     height, width = frame.shape[:2]
     if len(frame.shape) == 3:
         channels = frame.shape[2]
@@ -44,23 +43,23 @@ def get_frame_info(frame):
         "shape": frame.shape
     }
 
-
 def is_likely_stereo(aspect_ratio):
     """
     Determine whether a frame has an aspect ratio that
     resembles a side-by-side stereo image.
 
-    This is only a heuristic. It does NOT prove that the
+    This is only a heuristic. It does not prove that the
     camera is stereo.
     """
-
     return aspect_ratio >= STEREO_ASPECT_RATIO
-
 
 # CAMERA DISCOVERY
 def scan_cameras():
     """
     Scan available camera indices and collect basic information.
+
+    Returns:
+        List of camera configuration dictionaries.
     """
 
     cameras = []
@@ -68,19 +67,21 @@ def scan_cameras():
     print("       Projectile Tracking - Camera Discovery")
     print("=" * 55)
     print("\nScanning for cameras...\n")
+
     for index in range(MAX_CAMERA_INDEX):
         camera = open_camera(index)
 
         if not camera.isOpened():
             camera.release()
             continue
+
         success, frame = camera.read()
 
         if not success or frame is None:
             camera.release()
             continue
-        info = get_frame_info(frame)
 
+        info = get_frame_info(frame)
         likely_stereo = is_likely_stereo(
             info["aspect_ratio"]
         )
@@ -95,23 +96,34 @@ def scan_cameras():
             "likely_stereo": likely_stereo
         }
         cameras.append(camera_info)
+
         print(f"[{index}] Camera detected")
-        print(f"    Resolution   : "
-              f"{info['width']} x {info['height']}")
-        print(f"    Frame shape  : {info['shape']}")
-        print(f"    Channels     : {info['channels']}")
-        print(f"    Aspect ratio : "
-              f"{info['aspect_ratio']:.2f}")
+        print(
+            f"    Resolution   : "
+            f"{info['width']} x {info['height']}"
+        )
+        print(
+            f"    Frame shape  : "
+            f"{info['shape']}"
+        )
+        print(
+            f"    Channels     : "
+            f"{info['channels']}"
+        )
+        print(
+            f"    Aspect ratio : "
+            f"{info['aspect_ratio']:.2f}"
+        )
 
         if likely_stereo:
-            print("  Likely stereo feed")
-        print()
+            print("    Likely stereo feed")
 
+        print()
         camera.release()
 
     print("-" * 55)
     if not cameras:
-        print(" No cameras detected.")
+        print("No cameras detected.")
     else:
         print(f"Found {len(cameras)} camera(s).")
     print()
@@ -119,24 +131,28 @@ def scan_cameras():
 
 
 # CAMERA SELECTION
-
 def select_camera(cameras):
     """
     Display detected cameras and allow the user to choose one.
 
     Returns:
-        Selected camera index, or None.
+        Selected camera configuration dictionary, or None.
     """
     if not cameras:
+
         root = tk.Tk()
         root.withdraw()
+
         messagebox.showerror(
             "No Cameras Found",
             "No cameras could be detected.\n\n"
             "Make sure your camera is connected and try again."
         )
+
         root.destroy()
+
         return None
+
     root = tk.Tk()
     root.title(
         "Projectile Tracking - Camera Selection"
@@ -150,6 +166,7 @@ def select_camera(cameras):
         text="Select Camera",
         font=("Arial", 18, "bold")
     )
+
     title.pack(pady=(20, 5))
 
     # Description
@@ -157,8 +174,8 @@ def select_camera(cameras):
         root,
         text=(
             "Choose the camera you want to test.\n"
-            "⭐ indicates a camera that looks like a "
-            "possible stereo feed."
+            "A stereo indicator marks cameras that appear "
+            "to provide a possible stereo feed."
         ),
         font=("Arial", 10)
     )
@@ -171,11 +188,12 @@ def select_camera(cameras):
         height=12,
         font=("Consolas", 10)
     )
+
     listbox.pack(pady=15)
     for camera in cameras:
         stereo_label = ""
         if camera["likely_stereo"]:
-            stereo_label = " Likely stereo"
+            stereo_label = "  Likely stereo"
         text = (
             f"[{camera['index']}]  "
             f"{camera['width']} x "
@@ -183,6 +201,7 @@ def select_camera(cameras):
             f"Aspect: {camera['aspect_ratio']:.2f}"
             f"{stereo_label}"
         )
+
         listbox.insert(
             tk.END,
             text
@@ -194,22 +213,26 @@ def select_camera(cameras):
         for i, camera in enumerate(cameras)
         if camera["likely_stereo"]
     ]
+
     if stereo_indices:
+
         listbox.selection_set(
             stereo_indices[0]
         )
+
         listbox.activate(
             stereo_indices[0]
         )
+
     else:
         listbox.selection_set(0)
         listbox.activate(0)
-    selected_camera = {
-        "index": None
-    }
+    selected_camera = None
+
 
     # Selection callback
     def confirm_selection():
+        nonlocal selected_camera
         selection = listbox.curselection()
         if not selection:
             messagebox.showwarning(
@@ -217,12 +240,9 @@ def select_camera(cameras):
                 "Please select a camera first."
             )
             return
-        selected = cameras[
+        selected_camera = cameras[
             selection[0]
         ]
-        selected_camera["index"] = (
-            selected["index"]
-        )
         root.destroy()
 
     # Button
@@ -236,8 +256,7 @@ def select_camera(cameras):
     )
     button.pack(pady=10)
     root.mainloop()
-    return selected_camera["index"]
-
+    return selected_camera
 
 # FPS MEASUREMENT
 
@@ -249,9 +268,14 @@ def measure_fps(camera):
         Measured FPS.
     """
     print("\nMeasuring camera FPS...")
-    print(f"Test duration: {FPS_TEST_DURATION} seconds")
+    print(
+        f"Test duration: "
+        f"{FPS_TEST_DURATION} seconds"
+    )
+
     frame_count = 0
     start_time = time.perf_counter()
+    elapsed = 0.0
 
     while True:
         success, frame = camera.read()
@@ -265,12 +289,10 @@ def measure_fps(camera):
 
         if elapsed >= FPS_TEST_DURATION:
             break
-
     if elapsed <= 0:
         return 0.0
+    return frame_count / elapsed
 
-    fps = frame_count / elapsed
-    return fps
 
 # STEREO PREVIEW
 def show_stereo_preview(frame):
@@ -279,8 +301,10 @@ def show_stereo_preview(frame):
     and display them separately.
 
     This function assumes a side-by-side layout.
-    """
 
+    Returns:
+        left_frame, right_frame
+    """
     height, width = frame.shape[:2]
     midpoint = width // 2
     left_frame = frame[:, :midpoint]
@@ -295,8 +319,8 @@ def show_stereo_preview(frame):
     )
     return left_frame, right_frame
 
-# CAMERA TESTING
 
+# CAMERA TESTING
 def test_camera(camera_index):
     """
     Open the selected camera, inspect its output,
@@ -305,17 +329,16 @@ def test_camera(camera_index):
     camera = open_camera(camera_index)
     if not camera.isOpened():
         print(
-            f"\n Unable to open camera "
+            f"\nUnable to open camera "
             f"{camera_index}."
         )
-
         return
 
     # First frame
     success, frame = camera.read()
     if not success or frame is None:
         print(
-            f"\n Unable to read frames "
+            f"\nUnable to read frames "
             f"from camera {camera_index}."
         )
         camera.release()
@@ -331,39 +354,43 @@ def test_camera(camera_index):
     print("=" * 55)
     print("              Selected Camera")
     print("=" * 55)
+
     print(
-        f"Camera index : {camera_index}"
+        f"Camera index : "
+        f"{camera_index}"
     )
+
     print(
         f"Resolution   : "
         f"{info['width']} x {info['height']}"
     )
+
     print(
         f"Frame shape  : "
         f"{info['shape']}"
     )
+
     print(
         f"Channels     : "
         f"{info['channels']}"
     )
+
     print(
         f"Aspect ratio : "
         f"{info['aspect_ratio']:.2f}"
     )
 
     if likely_stereo:
-        print(
-            "Stereo status: Likely stereo feed"
-        )
+        print("Stereo status: Likely stereo feed")
+
     else:
-        print(
-            "Stereo status: Standard camera aspect ratio"
-        )
+        print("Stereo status: Standard camera aspect ratio")
 
     # FPS
     fps = measure_fps(camera)
     print(
-        f"Measured FPS : {fps:.2f}"
+        f"Measured FPS : "
+        f"{fps:.2f}"
     )
     print("=" * 55)
 
@@ -371,20 +398,17 @@ def test_camera(camera_index):
     print("\nStarting live preview.")
     print("Press Q to exit.")
     print()
+
     while True:
         success, frame = camera.read()
         if not success:
-            print(
-                "Failed to read frame."
-            )
+            print("Failed to read frame.")
             break
 
         cv2.imshow(
             f"Camera {camera_index} - Raw Feed",
             frame
         )
-        # If the feed looks stereo, also show
-        # the two halves independently.
         if likely_stereo:
             show_stereo_preview(frame)
         key = cv2.waitKey(1) & 0xFF
@@ -400,39 +424,47 @@ def test_camera(camera_index):
     print("=" * 55)
     print("             Camera Test Summary")
     print("=" * 55)
+
     print(
-        f"Camera index    : {camera_index}"
+        f"Camera index    : "
+        f"{camera_index}"
     )
+
     print(
         f"Resolution      : "
         f"{info['width']} x {info['height']}"
     )
+
     print(
         f"Frame shape     : "
         f"{info['shape']}"
     )
+
     print(
         f"Aspect ratio    : "
         f"{info['aspect_ratio']:.2f}"
     )
+
     print(
         f"Measured FPS    : "
         f"{fps:.2f}"
     )
+
     print(
         f"Likely stereo   : "
         f"{'YES' if likely_stereo else 'NO'}"
     )
+
     if likely_stereo:
         half_width = info["width"] // 2
         print(
             f"Possible L/R size: "
-            f"{half_width} x {info['height']} each"
+            f"{half_width} x "
+            f"{info['height']} each"
         )
     print("=" * 55)
-    print(
-        "\nCamera test completed successfully."
-    )
+    print(  "\nCamera test completed successfully.")
+
 
 # MAIN
 def main():
@@ -440,17 +472,23 @@ def main():
     if not cameras:
         return
     selected_camera = select_camera(cameras)
-
     if selected_camera is None:
         print("No camera selected.")
         return
 
     print(
         f"\nSelected camera index: "
-        f"{selected_camera}"
+        f"{selected_camera['index']}"
     )
+
+    print(
+        f"Selected resolution: "
+        f"{selected_camera['width']} x "
+        f"{selected_camera['height']}"
+    )
+
     test_camera(
-        selected_camera
+        selected_camera["index"]
     )
 
 
