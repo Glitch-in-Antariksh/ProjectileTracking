@@ -1,0 +1,20 @@
+{
+    "index": 1,
+    "width": 2560,
+    "height": 960,
+    "channels": 3,
+    "aspect_ratio": 2.6666666666666665,
+    "shape": [
+        960,
+        2560,
+        3
+    ],
+    "likely_stereo": true,
+    "measured_fps": 41.89630872885067,
+    "checkerboard": {
+        "corners_horizontal": 7,
+        "corners_vertical": 9,
+        "square_size": 20.0,
+        "square_size_unit": "mm"
+    }
+}
