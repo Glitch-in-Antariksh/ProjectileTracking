@@ -1,12 +1,21 @@
 # Projectile Tracking
 
-An embedded AI and computer vision project focused on real-time projectile detection, 3D localization, trajectory estimation, and trajectory prediction using stereo vision and depth perception.
+An embedded AI and computer vision project focused on real-time projectile detection, 3D localization, trajectory estimation, and trajectory prediction using stereo vision.
 
 ## Overview
 
 The objective of this project is to develop a computer vision system capable of detecting a moving projectile, estimating its position in three-dimensional space, tracking its motion, and predicting its future trajectory.
 
-The project is being developed incrementally, beginning with a laptop-based stereo vision system. The first phase focuses entirely on **camera perception, object identification, 3D localization, motion tracking, and trajectory prediction**.
+Development is currently focused on a laptop-based stereo vision system. The first phase covers:
+
+- Stereo camera acquisition
+- Camera configuration and validation
+- Stereo camera calibration
+- Projectile identification
+- 3D localization
+- Motion tracking
+- Trajectory estimation
+- Trajectory prediction
 
 A physical actuation and interception system is planned as a future extension once the vision and prediction pipeline has been validated.
 
@@ -14,163 +23,122 @@ A physical actuation and interception system is planned as a future extension on
 
 # Phase 1 — Vision and Trajectory Prediction
 
-Phase 1 is the core computer vision stage of the project.
+Phase 1 is developed and tested using:
 
-The entire system can be developed and tested using:
-
-* ELP stereo camera
-* Laptop
-* Python
-* OpenCV
-* YOLO
-* PyCharm
+- ELP stereo camera
+- Laptop
+- Python
+- OpenCV
+- YOLO
+- PyCharm
 
 No Raspberry Pi or external actuation hardware is required during this phase.
 
-The primary objective is to progress from raw stereo camera data to a predicted three-dimensional trajectory.
+The current development priority is to complete the vision pipeline from stereo camera input to a tracked and predicted three-dimensional projectile trajectory.
 
-```text
-                  ELP Stereo Camera
-                          │
-                          ▼
-                  Stereo Image Pair
-                    /          \
-                   ▼            ▼
-              Left Image     Right Image
-                   │            │
-                   └─────┬──────┘
-                         ▼
-                  Stereo Processing
-                         │
-                         ▼
-                  Depth Estimation
-                         │
-                         ▼
-                  3D Localization
-                         │
-                         ▼
-                   Object Tracking
-                         │
-                         ▼
-                 Trajectory Estimation
-                         │
-                         ▼
-                 Trajectory Prediction
-```
+---
 
 ## 1. Camera Testing
 
-The first implemented component is `camera_test.py`.
-
-Its purpose is to understand and validate the connected camera hardware before it is integrated into the rest of the system.
+`camera_test.py` is used to discover and validate the connected camera before it is used by the rest of the system.
 
 The testing layer:
 
-* Discovers available camera indices
-* Allows the user to select a camera
-* Inspects frame resolution, shape, channels, and aspect ratio
-* Identifies feeds that are likely to contain stereo imagery
-* Measures approximate camera FPS
-* Provides a live preview of the selected camera
-* Displays the suspected left and right views separately
-* Produces a final camera-test summary
+- Discovers available camera indices
+- Allows the user to select a camera
+- Inspects frame resolution, shape, channels, and aspect ratio
+- Identifies feeds that are likely to contain stereo imagery
+- Measures approximate camera FPS
+- Provides a live preview
+- Displays the left and right stereo views separately
+- Tests available camera resolutions
+- Allows the user to select a suitable resolution
+
+The camera is currently capable of providing a **2560 × 960 stereo frame**, giving approximately **1280 × 960 pixels per camera view** at around 50 FPS.
 
 Camera indices are intentionally not hardcoded because they can vary between systems.
 
-The stereo-camera identification is currently heuristic and is based on the aspect ratio of the captured frame. It is intended to assist with hardware identification rather than serve as definitive camera identification.
-
-The purpose of this layer is to isolate hardware-specific testing from the rest of the project.
+The stereo-camera identification is heuristic and is based on the captured frame characteristics. It is intended to assist with hardware identification rather than serve as definitive camera identification.
 
 ---
 
 ## 2. Stereo Camera Interface
 
-After the hardware has been validated, the camera will be integrated through `camera.py`.
+`camera.py` provides the reusable interface between the physical stereo camera and the rest of the project.
 
-This module will provide a consistent interface for acquiring stereo frames while hiding hardware-specific details from the rest of the project.
+It is responsible for:
 
-The rest of the system should eventually be able to request a stereo image pair without needing to know:
+- Loading the selected camera configuration
+- Opening the selected camera
+- Requesting the configured resolution
+- Verifying the actual resolution supplied by the camera
+- Capturing stereo frames
+- Splitting the side-by-side camera feed into left and right images
+- Releasing the camera safely
 
-* Which camera index is being used
-* How the camera is exposed to the operating system
-* How the stereo frame is packaged
-* How the left and right views are extracted
-
-The intended abstraction is conceptually:
+The rest of the system can obtain a stereo image pair through:
 
 ```python
 left_frame, right_frame = camera.read()
 ```
 
-This creates a clean boundary between the physical camera and the computer vision pipeline.
+This keeps hardware-specific camera handling separate from the computer vision modules.
 
 ---
 
 ## 3. Stereo Camera Calibration
 
-Once reliable stereo images can be acquired, the camera will be calibrated.
+`calibration.py` is used to calibrate the stereo camera using a physical checkerboard.
 
-Stereo calibration will establish the geometric properties required to estimate physical depth from the two camera views.
+The current checkerboard contains **8 × 10 squares**, corresponding to **7 × 9 internal corners**. The calibration system uses the internal-corner count when detecting the pattern.
 
-The calibration process will determine parameters such as:
+The calibration process estimates:
 
-* Camera intrinsic parameters
-* Lens distortion
-* Relative orientation of the two cameras
-* Relative translation between the cameras
-* Stereo rectification parameters
+- Camera intrinsic parameters
+- Lens distortion
+- Relative orientation of the two cameras
+- Relative translation between the cameras
+- Stereo calibration parameters
 
-A calibration target such as a chessboard pattern will be used to obtain corresponding points between the two views.
-
-Calibration data will be stored in:
+Calibration data is stored in:
 
 ```text
 data/calibration/
 ```
 
-The goal is to establish a reliable geometric model of the stereo camera before attempting metric depth estimation.
+### Calibration Interface
+
+Calibration is designed as a guided user interaction rather than requiring the user to manually decide when to capture each image.
+
+During calibration, the interface displays the live stereo camera views and provides a **target box** showing approximately where the checkerboard should be positioned for the current capture.
+
+The target box is a visual guide. It helps the user move the checkerboard into useful positions and orientations while the system searches for the pattern in the surrounding image area.
+
+The system automatically detects the checkerboard and captures a pose when the board is successfully detected and sufficiently stable.
+
+Multiple guided checkerboard poses are collected so that the calibration contains varied positions, orientations, and perspectives.
+
+At the end of calibration, the interface reports the left-camera reprojection error, right-camera reprojection error, stereo RMS error, and an overall calibration-quality result.
+
+A successful calibration is then available to the rest of the vision pipeline.
 
 ---
 
 ## 4. Stereo Rectification
 
-After calibration, the stereo images will be rectified so that corresponding points between the left and right images can be compared more reliably.
+After calibration, the stereo images can be rectified so that corresponding points in the left and right images can be compared more reliably.
 
-```text
-Raw Left Image       Raw Right Image
-       │                    │
-       └────────┬───────────┘
-                ▼
-        Stereo Calibration
-                │
-                ▼
-        Stereo Rectification
-                │
-          ┌─────┴─────┐
-          ▼           ▼
-      Rectified    Rectified
-        Left         Right
-```
+Rectification is the intermediate stage between calibration and depth estimation.
 
-Rectification is an important intermediate stage between calibration and depth estimation.
+The rectified images will provide the basis for subsequent stereo correspondence and 3D localization.
 
 ---
 
 ## 5. Depth Estimation
 
-Once the stereo camera has been calibrated and rectified, the system will estimate depth from the disparity between corresponding points in the two images.
+Once the stereo camera has been calibrated and rectified, the system will estimate depth from the relationship between corresponding points in the two camera views.
 
-```text
-Left Image + Right Image
-           │
-           ▼
-        Disparity
-           │
-           ▼
-        Depth Map
-```
-
-The first experiments will use objects placed at known distances from the camera.
+Initial experiments will use objects placed at known distances from the camera.
 
 For example:
 
@@ -182,52 +150,35 @@ Actual Distance    Estimated Distance
       2.0 m                ?
 ```
 
-These experiments will be used to evaluate the accuracy and stability of the stereo-depth system before introducing a moving target.
+These experiments will be used to evaluate the accuracy and stability of the stereo-depth system before introducing a moving projectile.
 
 ---
 
 ## 6. Projectile Identification
 
-After the stereo-depth pipeline is functional, object detection will be introduced.
+After the stereo-depth foundation is functional, object detection will be introduced.
 
 The initial target will be a small, lightweight **paper projectile** or another soft test projectile whose appearance can be reliably detected by the vision system.
 
-YOLO will be used to identify the projectile in the camera frames.
+YOLO is planned for projectile identification.
 
 The initial objective is straightforward:
 
 > Detect the projectile reliably.
 
-At this stage, the focus is on object identification rather than trajectory prediction.
+At this stage, the focus is on identifying the projectile in the camera frames rather than predicting its trajectory.
 
 ---
 
 ## 7. 3D Projectile Localization
 
-Object detection and stereo depth will then be combined.
+Projectile detection and stereo depth will then be combined.
 
-YOLO provides the projectile's location within the image, while the stereo system provides depth information.
+The object detector will provide the projectile's image location, while the calibrated stereo system will provide the information required to estimate its depth.
 
-Together, these measurements can be used to estimate the projectile's position in three-dimensional space.
+Together, these measurements will produce an estimated projectile position in three-dimensional space.
 
-```text
-                 YOLO Detection
-                       │
-                       ▼
-               Image Coordinates
-                       │
-                       ├───────────────┐
-                       │               │
-                       ▼               ▼
-                 Stereo Position     Depth
-                       │               │
-                       └───────┬───────┘
-                               ▼
-                          3D Position
-                           (X, Y, Z)
-```
-
-The goal is to move from simply detecting a projectile in an image to determining **where it is in physical space**.
+The objective is to move from detecting a projectile in an image to determining **where it is in physical space**.
 
 ---
 
@@ -237,25 +188,15 @@ Once static 3D localization is reliable, the system will be tested with a moving
 
 A controlled **pendulum-mounted paper projectile** will initially be used.
 
-The pendulum provides a repeatable motion that allows the tracking system to be evaluated before introducing a freely launched projectile.
+The pendulum provides repeatable motion so that the tracking system can be evaluated before introducing a freely launched projectile.
 
-The system will collect a sequence of 3D measurements over time:
+The system will collect a sequence of 3D measurements over time, allowing it to estimate:
 
-```text
-t₀ → (X₀, Y₀, Z₀)
-t₁ → (X₁, Y₁, Z₁)
-t₂ → (X₂, Y₂, Z₂)
-t₃ → (X₃, Y₃, Z₃)
-...
-```
-
-From this sequence, the system can estimate quantities such as:
-
-* Position
-* Velocity
-* Direction of motion
-* Acceleration
-* Motion history
+- Position
+- Velocity
+- Direction of motion
+- Acceleration
+- Motion history
 
 ---
 
@@ -265,7 +206,7 @@ The sequence of observed 3D positions will be used to estimate the projectile's 
 
 The project will investigate suitable mathematical and computational approaches for fitting the observed motion.
 
-The initial experiments will use controlled motion before moving toward more complex projectile trajectories.
+Controlled motion will be used for the initial experiments before moving toward more complex projectile trajectories.
 
 The goal is to obtain a reliable representation of the projectile's current motion.
 
@@ -275,31 +216,11 @@ The goal is to obtain a reliable representation of the projectile's current moti
 
 Once trajectory estimation is reliable, the system will use the observed motion to predict the projectile's future position.
 
-```text
-Observed 3D Motion
-        │
-        ▼
-Trajectory Estimation
-        │
-        ▼
- Motion Model
-        │
-        ▼
-Future Position
-        │
-        ▼
-Predicted Trajectory
-```
-
-The eventual objective is for the system to determine not only:
+The eventual objective is for the system to determine:
 
 > Where is the projectile now?
 
-but also:
-
 > Where is the projectile going?
-
-and:
 
 > Where will it be after a given amount of time?
 
@@ -307,55 +228,42 @@ This prediction capability forms the final objective of Phase 1.
 
 ---
 
+# User Interface
+
+The project is designed to provide a simple guided interface for setup and operation.
+
+When the application starts, the main interface shows the status of the camera configuration and stereo calibration.
+
+Once both are ready, the user can select:
+
+- **Start Tracking** — begins the tracking stage
+- **Run Setup Again** — repeats the camera/calibration setup
+- **Exit** — closes the application
+
+During camera setup, the user is guided through camera selection and resolution selection.
+
+During stereo calibration, the user sees the live stereo camera views and a target box that indicates where to position the checkerboard for each capture. The system handles detection and automatic capture once the board is correctly positioned and stable.
+
+The tracking interface will be implemented as the next major development stage.
+
+---
+
 # System Architecture
 
-The Phase 1 architecture is designed to keep each major responsibility independent.
+The project is divided into independent modules so that camera handling, calibration, depth estimation, tracking, and trajectory processing can be developed and tested separately.
 
-```text
-                    ELP Stereo Camera
-                           │
-                           ▼
-                      camera_test.py
-                           │
-                    Hardware Validation
-                           │
-                           ▼
-                        camera.py
-                           │
-                    Stereo Image Pair
-                           │
-                           ▼
-                     calibration.py
-                           │
-                    Stereo Calibration
-                           │
-                           ▼
-                    Stereo Rectification
-                           │
-                           ▼
-                         depth.py
-                           │
-                    Depth Estimation
-                           │
-                           ▼
-                       YOLO Detection
-                           │
-                           ▼
-                      3D Localization
-                           │
-                           ▼
-                       tracking.py
-                           │
-                           ▼
-                     trajectory.py
-                           │
-                           ▼
-                 Trajectory Prediction
-```
+### Current modules
 
-The goal is to keep hardware handling, calibration, depth estimation, object detection, tracking, and trajectory prediction as separate modules.
+- `main.py` — application interface and overall workflow
+- `camera_test.py` — camera discovery, inspection, resolution testing, and preview
+- `camera.py` — reusable stereo camera interface
+- `calibration.py` — stereo checkerboard calibration
+- `depth.py` — depth and 3D localization
+- `tracking.py` — projectile detection and tracking
+- `trajectory.py` — trajectory estimation and prediction
+- `utils.py` — shared utilities
 
-This allows each stage to be tested independently and prevents hardware-specific complexity from spreading throughout the project.
+The tracking, depth, and trajectory modules are currently being developed after completion of the camera setup and stereo calibration stages.
 
 ---
 
@@ -383,13 +291,15 @@ ProjectileTracking/
 └── README.md
 ```
 
+Generated calibration captures are local working data and should not be committed to the repository.
+
 ---
 
 # Future Work — Phase 2
 
 After the vision and trajectory-prediction pipeline is validated, the project may be extended into a physical interception system.
 
-This stage would introduce embedded hardware such as a Raspberry Pi, sensors, servos, actuators, and a suitable interception mechanism.
+This stage may introduce embedded hardware such as a Raspberry Pi, sensors, servos, actuators, and a suitable interception mechanism.
 
 The predicted trajectory from Phase 1 would be used to determine a suitable interception point, after which the physical system could position or activate an actuator to interact with the predicted trajectory.
 
@@ -401,41 +311,56 @@ The Raspberry Pi is therefore intentionally **not part of the current vision-dev
 
 # Development Roadmap
 
-The project is being developed incrementally. Each major stage should be validated before the next stage is introduced.
+The project is being developed incrementally. Each major stage is validated before the next stage is introduced.
 
-* [x] Project planning and repository setup
-* [x] Git and GitHub integration
-* [x] Initial project structure
-* [x] Laptop development environment
-* [x] ELP stereo camera acquisition
-* [x] Camera discovery and testing
-* [x] Camera selection
-* [x] Stereo-feed inspection
-* [x] Camera preview
-* [x] Approximate FPS measurement
-* [ ] Reusable stereo camera interface
-* [ ] Stereo image acquisition
-* [ ] Stereo camera calibration
-* [ ] Stereo rectification
-* [ ] Depth estimation
-* [ ] Known-distance depth validation
-* [ ] Projectile identification using YOLO
-* [ ] 3D projectile localization
-* [ ] Moving projectile tracking
-* [ ] Trajectory estimation
-* [ ] Trajectory prediction
-* [ ] Phase 1 system validation
-* [ ] Physical interception system design
-* [ ] Raspberry Pi integration
-* [ ] Actuator and sensor integration
-* [ ] Phase 2 system testing
+- [x] Project planning and repository setup
+- [x] Git and GitHub integration
+- [x] Initial project structure
+- [x] Laptop development environment
+- [x] ELP stereo camera acquisition
+- [x] Camera discovery and testing
+- [x] Camera selection
+- [x] Stereo-feed inspection
+- [x] Camera preview
+- [x] Approximate FPS measurement
+- [x] Camera resolution testing and selection
+- [x] Reusable stereo camera interface
+- [x] Stereo image acquisition
+- [x] Stereo checkerboard calibration
+- [x] Guided calibration interface
+- [x] Automatic checkerboard capture
+- [x] Calibration quality validation
+- [ ] Stereo rectification
+- [ ] Depth estimation
+- [ ] Known-distance depth validation
+- [ ] Projectile identification using YOLO
+- [ ] 3D projectile localization
+- [ ] Moving projectile tracking
+- [ ] Trajectory estimation
+- [ ] Trajectory prediction
+- [ ] Phase 1 system validation
+- [ ] Physical interception system design
+- [ ] Raspberry Pi integration
+- [ ] Actuator and sensor integration
+- [ ] Phase 2 system testing
 
 ---
 
 # Current Status
 
-The initial project structure and development environment have been established.
+The camera setup and stereo calibration stages are complete.
 
-The ELP stereo camera has been successfully connected to the laptop and validated using `camera_test.py`. Camera discovery, selection, frame inspection, stereo-feed inspection, live preview, and approximate FPS measurement are currently functional.
+The ELP stereo camera has been successfully connected to the laptop and validated. The system can discover the camera, test available resolutions, select a suitable stereo resolution, acquire synchronized left and right views, and provide them through the reusable camera interface.
 
-The next development milestone is to implement the reusable stereo camera interface and begin the stereo calibration process.
+Stereo calibration is also functional. The checkerboard calibration interface guides the user through multiple poses using an on-screen target box and automatically captures valid, stable views.
+
+The current calibration setup uses a **2560 × 960 stereo frame**, providing approximately **1280 × 960 pixels per camera view**. A recent calibration produced:
+
+- Left-camera reprojection error: **0.371 px**
+- Right-camera reprojection error: **0.379 px**
+- Stereo RMS error: **0.746 px**
+- Calibration quality: **GOOD**
+
+The project is now moving into the **tracking stage**.
+
+`tracking.py`, `depth.py`, and `trajectory.py` are currently placeholders. The next milestone is to implement reliable projectile detection and tracking, followed by stereo depth, 3D localization, and trajectory estimation.
