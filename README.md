@@ -21,9 +21,11 @@ A physical actuation and interception system is planned as a future extension on
 
 ---
 
-# Phase 1 — Vision and Trajectory Prediction
+# Phase 1 — Stereo Vision and 3D Localization
 
-Phase 1 is developed and tested using:
+Phase 1 focuses on establishing a reliable stereo-vision foundation using a **static crushed paper ball** as the initial target.
+
+The system is developed and tested using:
 
 - ELP stereo camera
 - Laptop
@@ -34,9 +36,14 @@ Phase 1 is developed and tested using:
 
 No Raspberry Pi or external actuation hardware is required during this phase.
 
-The current development priority is to complete the vision pipeline from stereo camera input to a tracked and predicted three-dimensional projectile trajectory.
+The main objectives are:
 
----
+- Reliable stereo image acquisition
+- Camera configuration and validation
+- Stereo camera calibration
+- Object detection
+- Depth estimation
+- 3D position estimation
 
 ## 1. Camera Testing
 
@@ -54,26 +61,19 @@ The testing layer:
 - Tests available camera resolutions
 - Allows the user to select a suitable resolution
 
-The camera is currently capable of providing a **2560 × 960 stereo frame**, giving approximately **1280 × 960 pixels per camera view** at around 50 FPS.
-
-Camera indices are intentionally not hardcoded because they can vary between systems.
-
-The stereo-camera identification is heuristic and is based on the captured frame characteristics. It is intended to assist with hardware identification rather than serve as definitive camera identification.
-
----
+The current camera setup can provide a **2560 × 960 stereo frame**, giving approximately **1280 × 960 pixels per camera view** at around 50 FPS.
 
 ## 2. Stereo Camera Interface
 
 `camera.py` provides the reusable interface between the physical stereo camera and the rest of the project.
 
-It is responsible for:
+It handles:
 
 - Loading the selected camera configuration
-- Opening the selected camera
-- Requesting the configured resolution
-- Verifying the actual resolution supplied by the camera
+- Opening the camera
+- Requesting and verifying the configured resolution
 - Capturing stereo frames
-- Splitting the side-by-side camera feed into left and right images
+- Splitting the side-by-side feed into left and right images
 - Releasing the camera safely
 
 The rest of the system can obtain a stereo image pair through:
@@ -82,21 +82,17 @@ The rest of the system can obtain a stereo image pair through:
 left_frame, right_frame = camera.read()
 ```
 
-This keeps hardware-specific camera handling separate from the computer vision modules.
-
----
-
 ## 3. Stereo Camera Calibration
 
-`calibration.py` is used to calibrate the stereo camera using a physical checkerboard.
+`calibration.py` calibrates the stereo camera using a physical checkerboard.
 
-The current checkerboard contains **8 × 10 squares**, corresponding to **7 × 9 internal corners**. The calibration system uses the internal-corner count when detecting the pattern.
+The current checkerboard contains **8 × 10 squares**, corresponding to **7 × 9 internal corners**.
 
 The calibration process estimates:
 
 - Camera intrinsic parameters
 - Lens distortion
-- Relative orientation of the two cameras
+- Relative orientation of the cameras
 - Relative translation between the cameras
 - Stereo calibration parameters
 
@@ -108,39 +104,35 @@ data/calibration/
 
 ### Calibration Interface
 
-Calibration is designed as a guided user interaction rather than requiring the user to manually decide when to capture each image.
+The calibration screen shows the live left and right camera views and a **target box** for the current checkerboard pose.
 
-During calibration, the interface displays the live stereo camera views and provides a **target box** showing approximately where the checkerboard should be positioned for the current capture.
+The target box is a visual guide. It helps the user position the checkerboard in useful locations and orientations while the system searches the surrounding image area for the pattern.
 
-The target box is a visual guide. It helps the user move the checkerboard into useful positions and orientations while the system searches for the pattern in the surrounding image area.
+Once the checkerboard is detected and sufficiently stable, the system automatically captures the pose.
 
-The system automatically detects the checkerboard and captures a pose when the board is successfully detected and sufficiently stable.
+Multiple guided poses are collected so that the calibration contains varied positions, orientations, and perspectives.
 
-Multiple guided checkerboard poses are collected so that the calibration contains varied positions, orientations, and perspectives.
-
-At the end of calibration, the interface reports the left-camera reprojection error, right-camera reprojection error, stereo RMS error, and an overall calibration-quality result.
-
-A successful calibration is then available to the rest of the vision pipeline.
-
----
+At the end of calibration, the interface reports the left-camera reprojection error, right-camera reprojection error, stereo RMS error, and overall calibration quality.
 
 ## 4. Stereo Rectification
 
 After calibration, the stereo images can be rectified so that corresponding points in the left and right images can be compared more reliably.
 
-Rectification is the intermediate stage between calibration and depth estimation.
+Rectification provides the basis for stereo correspondence and 3D localization.
 
-The rectified images will provide the basis for subsequent stereo correspondence and 3D localization.
+## 5. Static Paper-Ball Detection and Depth Estimation
 
----
+The first actual vision experiment uses a **crushed paper ball placed at known positions**.
 
-## 5. Depth Estimation
+The objective is to establish that the system can:
 
-Once the stereo camera has been calibrated and rectified, the system will estimate depth from the relationship between corresponding points in the two camera views.
+1. Detect the paper ball in the left image.
+2. Detect the same paper ball in the right image.
+3. Match the two observations.
+4. Estimate its depth from the stereo pair.
+5. Produce a three-dimensional position.
 
-Initial experiments will use objects placed at known distances from the camera.
-
-For example:
+Known-distance tests will be used to evaluate the depth system:
 
 ```text
 Actual Distance    Estimated Distance
@@ -150,47 +142,31 @@ Actual Distance    Estimated Distance
       2.0 m                ?
 ```
 
-These experiments will be used to evaluate the accuracy and stability of the stereo-depth system before introducing a moving projectile.
+The purpose of this stage is to validate stereo geometry and 3D localization before introducing motion.
 
 ---
 
-## 6. Projectile Identification
+# Phase 2 — Controlled Motion Tracking
 
-After the stereo-depth foundation is functional, object detection will be introduced.
+Once the static paper ball can be detected and localized reliably in 3D, the same object will be introduced as a controlled moving target.
 
-The initial target will be a small, lightweight **paper projectile** or another soft test projectile whose appearance can be reliably detected by the vision system.
+## 6. Pendulum Motion
 
-YOLO is planned for projectile identification.
+The crushed paper ball will initially be attached to a pendulum.
 
-The initial objective is straightforward:
+This provides repeatable motion while allowing the tracking system to be tested under real movement.
 
-> Detect the projectile reliably.
+The system will collect a sequence of 3D measurements over time:
 
-At this stage, the focus is on identifying the projectile in the camera frames rather than predicting its trajectory.
+```text
+t₀ → (X₀, Y₀, Z₀)
+t₁ → (X₁, Y₁, Z₁)
+t₂ → (X₂, Y₂, Z₂)
+t₃ → (X₃, Y₃, Z₃)
+...
+```
 
----
-
-## 7. 3D Projectile Localization
-
-Projectile detection and stereo depth will then be combined.
-
-The object detector will provide the projectile's image location, while the calibrated stereo system will provide the information required to estimate its depth.
-
-Together, these measurements will produce an estimated projectile position in three-dimensional space.
-
-The objective is to move from detecting a projectile in an image to determining **where it is in physical space**.
-
----
-
-## 8. Moving Projectile Tracking
-
-Once static 3D localization is reliable, the system will be tested with a moving projectile.
-
-A controlled **pendulum-mounted paper projectile** will initially be used.
-
-The pendulum provides repeatable motion so that the tracking system can be evaluated before introducing a freely launched projectile.
-
-The system will collect a sequence of 3D measurements over time, allowing it to estimate:
+From this sequence, the system can estimate:
 
 - Position
 - Velocity
@@ -198,33 +174,49 @@ The system will collect a sequence of 3D measurements over time, allowing it to 
 - Acceleration
 - Motion history
 
----
+The pendulum stage validates the tracking pipeline before introducing freely moving objects.
 
-## 9. Trajectory Estimation
+## 7. Trajectory Estimation
 
-The sequence of observed 3D positions will be used to estimate the projectile's trajectory.
+The sequence of observed 3D positions will be used to estimate the object's trajectory.
 
 The project will investigate suitable mathematical and computational approaches for fitting the observed motion.
 
-Controlled motion will be used for the initial experiments before moving toward more complex projectile trajectories.
-
-The goal is to obtain a reliable representation of the projectile's current motion.
+Controlled pendulum motion will be used for the initial experiments before moving toward more complex motion.
 
 ---
 
-## 10. Trajectory Prediction
+# Phase 3 — Projectile Tracking and Prediction
 
-Once trajectory estimation is reliable, the system will use the observed motion to predict the projectile's future position.
+After static localization and controlled motion tracking are working reliably, the system will progress to the final application: projectile motion.
 
-The eventual objective is for the system to determine:
+## 8. Projectile Motion
+
+The completed detection and tracking pipeline will be applied to a freely moving projectile.
+
+At this stage, the system will need to handle:
+
+- Rapid movement
+- Changing position and orientation
+- Limited observation time
+- Continuous stereo detection
+- 3D localization over time
+
+The goal is to maintain a reliable sequence of three-dimensional observations while the projectile is in motion.
+
+## 9. Trajectory Prediction
+
+Once projectile tracking is reliable, the observed motion will be used to predict the projectile's future position.
+
+The final system should be able to determine:
 
 > Where is the projectile now?
 
-> Where is the projectile going?
+> Where is it going?
 
 > Where will it be after a given amount of time?
 
-This prediction capability forms the final objective of Phase 1.
+This prediction capability forms the final objective of the project.
 
 ---
 
