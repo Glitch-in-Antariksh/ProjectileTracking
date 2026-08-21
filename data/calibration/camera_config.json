@@ -1,5 +1,5 @@
 {
-    "index": 1,
+    "index": 0,
     "width": 2560,
     "height": 960,
     "channels": 3,
@@ -10,7 +10,7 @@
         3
     ],
     "likely_stereo": true,
-    "measured_fps": 50.199468335389724,
+    "measured_fps": 34.111004922217916,
     "checkerboard": {
         "corners_horizontal": 7,
         "corners_vertical": 9,

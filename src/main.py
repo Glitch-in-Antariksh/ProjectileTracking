@@ -10,8 +10,15 @@ from tkinter import messagebox
 SRC_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SRC_DIR.parent
 CALIBRATION_DIR = PROJECT_ROOT / "data" / "calibration"
-CAMERA_CONFIG_PATH = CALIBRATION_DIR / "camera_config.json"
-STEREO_CALIBRATION_PATH = CALIBRATION_DIR / "stereo_calibration.npz"
+
+CAMERA_CONFIG_PATH = (
+    CALIBRATION_DIR / "camera_config.json"
+)
+
+STEREO_CALIBRATION_PATH = (
+    CALIBRATION_DIR / "stereo_calibration.npz"
+)
+
 
 # ============================================================
 # IMPORTS
@@ -22,6 +29,7 @@ if str(SRC_DIR) not in sys.path:
 from camera import StereoCamera
 from setup import camera_test
 from setup import calibration
+from depth import run_depth
 
 
 # ============================================================
@@ -39,15 +47,32 @@ def load_camera_config():
         return None
 
     try:
-        with CAMERA_CONFIG_PATH.open("r", encoding="utf-8") as file:
+        with CAMERA_CONFIG_PATH.open(
+            "r",
+            encoding="utf-8",
+        ) as file:
             config = json.load(file)
-    except (OSError, json.JSONDecodeError) as error:
-        print(f"[MAIN] Failed to load camera configuration: {error}")
+
+    except (
+        OSError,
+        json.JSONDecodeError,
+    ) as error:
+        print(
+            f"[MAIN] Failed to load camera configuration: "
+            f"{error}"
+        )
         return None
 
-    required_keys = {"index", "width", "height"}
+    required_keys = {
+        "index",
+        "width",
+        "height",
+    }
+
     if not required_keys.issubset(config):
-        print("[MAIN] Camera configuration is incomplete.")
+        print(
+            "[MAIN] Camera configuration is incomplete."
+        )
         return None
 
     return config
@@ -64,7 +89,12 @@ def save_camera_config(config):
         bool:
             True if the configuration was saved successfully.
     """
-    required_keys = {"index", "width", "height"}
+    required_keys = {
+        "index",
+        "width",
+        "height",
+    }
+
     if not required_keys.issubset(config):
         print(
             "[MAIN] Cannot save camera configuration. "
@@ -73,14 +103,33 @@ def save_camera_config(config):
         return False
 
     try:
-        CALIBRATION_DIR.mkdir(parents=True, exist_ok=True)
-        with CAMERA_CONFIG_PATH.open("w", encoding="utf-8") as file:
-            json.dump(config, file, indent=4)
+        CALIBRATION_DIR.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        with CAMERA_CONFIG_PATH.open(
+            "w",
+            encoding="utf-8",
+        ) as file:
+            json.dump(
+                config,
+                file,
+                indent=4,
+            )
+
     except OSError as error:
-        print(f"[MAIN] Failed to save camera configuration: {error}")
+        print(
+            f"[MAIN] Failed to save camera configuration: "
+            f"{error}"
+        )
         return False
 
-    print(f"[MAIN] Camera configuration saved:\n    {CAMERA_CONFIG_PATH}")
+    print(
+        "[MAIN] Camera configuration saved:\n"
+        f"    {CAMERA_CONFIG_PATH}"
+    )
+
     return True
 
 
@@ -105,7 +154,10 @@ def setup_complete():
     """
     Return True when both required setup artifacts exist.
     """
-    return camera_config_exists() and calibration_exists()
+    return (
+        camera_config_exists()
+        and calibration_exists()
+    )
 
 
 # ============================================================
@@ -115,26 +167,55 @@ class ProjectileTrackingApp:
     """
     High-level application controller.
 
-    main.py is responsible only for orchestration, and owns the
-    single Tk() root and mainloop() for the entire application.
+    main.py is responsible for application orchestration and
+    owns the single Tk() root and mainloop().
 
-    Camera discovery/testing:  camera_test.py
-    Camera interface:          camera.py
-    Stereo calibration:        calibration.py
-    Future processing:         depth.py, tracking.py, trajectory.py
+    Current workflow:
 
-    Every dialog opened by camera_test.py or calibration.py is
-    created as a Toplevel of self.root (passed in as `parent`),
-    never as an independent tk.Tk(). This module is the only
-    place tk.Tk() is called and the only place mainloop() runs.
+        camera_test.py
+            ↓
+        camera.py
+            ↓
+        calibration.py
+            ↓
+        depth.py
+            ↓
+        tracking.py
+            ↓
+        trajectory.py
+
+    Current depth stage:
+        - static crushed paper-ball detection
+        - stereo correspondence
+        - disparity
+        - depth estimation
+        - 3D position
+
+    Every application window is a Toplevel of self.root.
+    This module is the only place tk.Tk() is created and the
+    only place mainloop() is started.
     """
 
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("Projectile Tracking System")
-        self.root.geometry("650x500")
-        self.root.resizable(False, False)
-        self.root.protocol("WM_DELETE_WINDOW", self.exit_application)
+
+        self.root.title(
+            "Projectile Tracking System"
+        )
+
+        self.root.geometry(
+            "650x500"
+        )
+
+        self.root.resizable(
+            False,
+            False,
+        )
+
+        self.root.protocol(
+            "WM_DELETE_WINDOW",
+            self.exit_application,
+        )
 
         self.build_ui()
 
@@ -149,31 +230,61 @@ class ProjectileTrackingApp:
             self.root,
             text="Projectile Tracking System",
             font=("Arial", 22, "bold"),
-        ).pack(pady=(35, 8))
+        ).pack(
+            pady=(35, 8)
+        )
 
         tk.Label(
             self.root,
-            text="Stereo camera setup and projectile tracking",
+            text=(
+                "Stereo camera setup and "
+                "3D object localization"
+            ),
             font=("Arial", 11),
-        ).pack(pady=(0, 25))
+        ).pack(
+            pady=(0, 25)
+        )
 
-        self.camera_status = tk.Label(self.root, font=("Arial", 11))
-        self.camera_status.pack(pady=4)
+        self.camera_status = tk.Label(
+            self.root,
+            font=("Arial", 11),
+        )
 
-        self.calibration_status = tk.Label(self.root, font=("Arial", 11))
-        self.calibration_status.pack(pady=4)
+        self.camera_status.pack(
+            pady=4
+        )
 
-        self.button_frame = tk.Frame(self.root)
-        self.button_frame.pack(pady=30)
+        self.calibration_status = tk.Label(
+            self.root,
+            font=("Arial", 11),
+        )
+
+        self.calibration_status.pack(
+            pady=4
+        )
+
+        self.button_frame = tk.Frame(
+            self.root
+        )
+
+        self.button_frame.pack(
+            pady=30
+        )
 
     def clear_buttons(self):
         """
         Remove all buttons currently displayed.
         """
-        for widget in self.button_frame.winfo_children():
+        for widget in (
+            self.button_frame.winfo_children()
+        ):
             widget.destroy()
 
-    def add_button(self, text, command):
+    def add_button(
+        self,
+        text,
+        command,
+    ):
         """
         Add a standard application button.
         """
@@ -184,7 +295,9 @@ class ProjectileTrackingApp:
             font=("Arial", 12),
             width=24,
             pady=8,
-        ).pack(pady=6)
+        ).pack(
+            pady=6
+        )
 
     def update_status(self):
         """
@@ -196,6 +309,7 @@ class ProjectileTrackingApp:
                 f"{'READY' if camera_config_exists() else 'NOT SET UP'}"
             )
         )
+
         self.calibration_status.config(
             text=(
                 "Stereo calibration: "
@@ -216,16 +330,26 @@ class ProjectileTrackingApp:
         tk.Label(
             self.button_frame,
             text=(
-                "Initial setup is required before tracking.\n\n"
-                "The setup wizard will configure the camera "
-                "and perform stereo calibration."
+                "Initial setup is required before "
+                "3D localization.\n\n"
+                "The setup wizard will configure the "
+                "camera and perform stereo calibration."
             ),
             font=("Arial", 11),
             justify="center",
-        ).pack(pady=(0, 20))
+        ).pack(
+            pady=(0, 20)
+        )
 
-        self.add_button("Start Setup", self.start_setup)
-        self.add_button("Exit", self.exit_application)
+        self.add_button(
+            "Start Setup",
+            self.start_setup,
+        )
+
+        self.add_button(
+            "Exit",
+            self.exit_application,
+        )
 
     def show_main_menu(self):
         """
@@ -234,9 +358,20 @@ class ProjectileTrackingApp:
         self.update_status()
         self.clear_buttons()
 
-        self.add_button("Start Tracking", self.start_tracking)
-        self.add_button("Run Setup Again", self.start_setup)
-        self.add_button("Exit", self.exit_application)
+        self.add_button(
+            "Start Tracking",
+            self.start_tracking,
+        )
+
+        self.add_button(
+            "Run Setup Again",
+            self.start_setup,
+        )
+
+        self.add_button(
+            "Exit",
+            self.exit_application,
+        )
 
     # ========================================================
     # CAMERA SETUP
@@ -257,30 +392,51 @@ class ProjectileTrackingApp:
         Returns:
             dict or None
         """
-        print("\n[MAIN] Starting camera_test.run_camera_setup()")
+        print(
+            "\n[MAIN] Starting "
+            "camera_test.run_camera_setup()"
+        )
 
-        config = camera_test.run_camera_setup(parent=self.root)
+        config = camera_test.run_camera_setup(
+            parent=self.root
+        )
 
         if config is None:
-            print("[MAIN] Camera setup returned no configuration.")
+            print(
+                "[MAIN] Camera setup returned "
+                "no configuration."
+            )
             return None
 
-        print("[MAIN] Camera setup completed.")
-        print(f"[MAIN] Camera index: {config['index']}")
-        print(f"[MAIN] Resolution: {config['width']} x {config['height']}")
+        print(
+            "[MAIN] Camera setup completed."
+        )
+
+        print(
+            f"[MAIN] Camera index: "
+            f"{config['index']}"
+        )
+
+        print(
+            f"[MAIN] Resolution: "
+            f"{config['width']} x "
+            f"{config['height']}"
+        )
 
         return config
 
     # ========================================================
     # CALIBRATION
     # ========================================================
-    def run_stereo_calibration(self, stereo_camera):
+    def run_stereo_calibration(
+        self,
+        stereo_camera,
+    ):
         """
         Delegate stereo calibration to calibration.py.
 
         The application's single root is passed as `parent` so
-        every calibration dialog (checkerboard config, guided
-        capture, results) is a Toplevel of it.
+        every calibration dialog is a Toplevel of self.root.
 
         Args:
             stereo_camera (StereoCamera):
@@ -290,11 +446,20 @@ class ProjectileTrackingApp:
             bool:
                 True if calibration succeeds.
         """
-        print("\n[MAIN] Starting calibration.run_calibration()")
+        print(
+            "\n[MAIN] Starting "
+            "calibration.run_calibration()"
+        )
 
-        result = calibration.run_calibration(stereo_camera, parent=self.root)
+        result = calibration.run_calibration(
+            stereo_camera,
+            parent=self.root,
+        )
 
-        print(f"[MAIN] Calibration result: {result}")
+        print(
+            f"[MAIN] Calibration result: "
+            f"{result}"
+        )
 
         return result
 
@@ -303,19 +468,8 @@ class ProjectileTrackingApp:
     # ========================================================
     def start_setup(self):
         """
-        Execute the complete setup workflow.
-
-        Every explicit request for setup runs camera selection
-        again. Normal application launches never enter this
-        function when setup is already complete.
-
-        Note: the main window is deliberately left visible (not
-        withdrawn) during setup. Every setup dialog is a Toplevel
-        that is transient to self.root and uses grab_set(), which
-        already makes them modal. Withdrawing self.root here would
-        also silently withdraw every Toplevel transient to it --
-        that's Tk's documented behavior for transient windows, and
-        it's what was causing the setup dialogs not to appear.
+        Execute the complete camera and calibration setup
+        workflow.
         """
         stereo_camera = None
 
@@ -330,38 +484,51 @@ class ProjectileTrackingApp:
                     "The camera setup window will let you "
                     "select and test your stereo camera."
                 ),
+                parent=self.root,
             )
 
-            selected_config = self.run_camera_setup()
+            selected_config = (
+                self.run_camera_setup()
+            )
 
             if selected_config is None:
                 messagebox.showwarning(
                     "Setup Cancelled",
                     (
-                        "Camera setup was cancelled or failed.\n\n"
+                        "Camera setup was cancelled "
+                        "or failed.\n\n"
                         "Stereo calibration was not started."
                     ),
+                    parent=self.root,
                 )
                 return
 
             # ------------------------------------------------
             # SAVE CAMERA CONFIGURATION
             # ------------------------------------------------
-            if not save_camera_config(selected_config):
+            if not save_camera_config(
+                selected_config
+            ):
                 messagebox.showerror(
                     "Setup Error",
                     (
                         "The camera was selected successfully, "
                         "but its configuration could not be saved."
                     ),
+                    parent=self.root,
                 )
                 return
 
             # ------------------------------------------------
             # CREATE STEREO CAMERA
             # ------------------------------------------------
-            stereo_camera = StereoCamera(selected_config)
-            print("[MAIN] StereoCamera instance created.")
+            stereo_camera = StereoCamera(
+                selected_config
+            )
+
+            print(
+                "[MAIN] StereoCamera instance created."
+            )
 
             # ------------------------------------------------
             # CALIBRATION
@@ -375,9 +542,14 @@ class ProjectileTrackingApp:
                     "and follow the instructions shown by "
                     "the calibration window."
                 ),
+                parent=self.root,
             )
 
-            calibration_success = self.run_stereo_calibration(stereo_camera)
+            calibration_success = (
+                self.run_stereo_calibration(
+                    stereo_camera
+                )
+            )
 
             if not calibration_success:
                 messagebox.showwarning(
@@ -387,6 +559,7 @@ class ProjectileTrackingApp:
                         "The camera configuration has been saved.\n"
                         "You can run setup again when ready."
                     ),
+                    parent=self.root,
                 )
                 return
 
@@ -400,14 +573,26 @@ class ProjectileTrackingApp:
                     "Camera configuration: READY\n"
                     "Stereo calibration: READY"
                 ),
+                parent=self.root,
             )
 
         except Exception as error:
-            print("\n[MAIN] SETUP ERROR")
-            print(repr(error))
+            print(
+                "\n[MAIN] SETUP ERROR"
+            )
+
+            print(
+                repr(error)
+            )
+
             messagebox.showerror(
                 "Setup Error",
-                f"An unexpected error occurred during setup:\n\n{error}",
+                (
+                    "An unexpected error occurred "
+                    "during setup:\n\n"
+                    f"{error}"
+                ),
+                parent=self.root,
             )
 
         finally:
@@ -422,20 +607,133 @@ class ProjectileTrackingApp:
                 self.show_first_run_menu()
 
     # ========================================================
-    # TRACKING PLACEHOLDER
+    # DEPTH / 3D LOCALIZATION
     # ========================================================
     def start_tracking(self):
         """
-        Placeholder for the future tracking pipeline.
+        Start the current static-object 3D localization stage.
+
+        The current implementation does not perform temporal
+        tracking yet.
+
+        depth.py currently handles:
+            - stereo camera acquisition
+            - stereo rectification
+            - crushed paper-ball detection
+            - stereo correspondence
+            - disparity calculation
+            - depth estimation
+            - 3D position calculation
+
+        Future versions will add temporal tracking and
+        trajectory processing.
         """
-        messagebox.showinfo(
-            "Tracking",
-            (
-                "Tracking is not implemented yet.\n\n"
-                "Camera setup and stereo calibration are "
-                "the current development stage."
-            ),
+        if not setup_complete():
+            messagebox.showwarning(
+                "Setup Required",
+                (
+                    "Camera setup and stereo calibration "
+                    "must be completed before starting "
+                    "3D localization."
+                ),
+                parent=self.root,
+            )
+
+            self.update_status()
+
+            if setup_complete():
+                self.show_main_menu()
+            else:
+                self.show_first_run_menu()
+
+            return
+
+        camera_config = (
+            load_camera_config()
         )
+
+        if camera_config is None:
+            messagebox.showerror(
+                "Camera Configuration Error",
+                (
+                    "The saved camera configuration could "
+                    "not be loaded.\n\n"
+                    "Run setup again before continuing."
+                ),
+                parent=self.root,
+            )
+
+            self.show_main_menu()
+            return
+
+        stereo_camera = None
+
+        try:
+            print(
+                "\n[MAIN] Starting 3D localization."
+            )
+
+            print(
+                "[MAIN] Loading saved camera configuration."
+            )
+
+            stereo_camera = StereoCamera(
+                camera_config
+            )
+
+            print(
+                "[MAIN] StereoCamera instance created."
+            )
+
+            print(
+                "[MAIN] Launching depth.py."
+            )
+
+            depth_ui = run_depth(
+                stereo_camera=stereo_camera,
+                parent=self.root,
+            )
+
+            if depth_ui is None:
+                print(
+                    "[MAIN] Depth localization "
+                    "did not start."
+                )
+
+        except Exception as error:
+            print(
+                "\n[MAIN] DEPTH ERROR"
+            )
+
+            print(
+                repr(error)
+            )
+
+            messagebox.showerror(
+                "3D Localization Error",
+                (
+                    "An unexpected error occurred "
+                    "while starting 3D localization:\n\n"
+                    f"{error}"
+                ),
+                parent=self.root,
+            )
+
+            # If depth.py failed before taking ownership
+            # of the camera, make sure it is not left open.
+            if stereo_camera is not None:
+                try:
+                    stereo_camera.release()
+                except Exception:
+                    pass
+
+        finally:
+            self.update_status()
+
+            if setup_complete():
+                self.show_main_menu()
+            else:
+                self.show_first_run_menu()
 
     # ========================================================
     # EXIT
@@ -446,6 +744,9 @@ class ProjectileTrackingApp:
         """
         self.root.destroy()
 
+    # ========================================================
+    # APPLICATION LOOP
+    # ========================================================
     def run(self):
         """
         Start the Tkinter event loop.
